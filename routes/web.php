@@ -1,29 +1,23 @@
 <?php
 
-use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Tenant\BillingController;
 use App\Http\Controllers\Tenant\DashboardController;
 use App\Http\Controllers\Tenant\SettingsController;
 use Illuminate\Support\Facades\Route;
 
-// ── Central domain: registration / marketing ─────────────────────────────────
-Route::middleware(['web'])->group(function () {
-    Route::get('/', fn () => view('welcome'))->name('home');
-    Route::get('/register', [RegisterController::class, 'showForm'])->name('register');
-    Route::post('/register', [RegisterController::class, 'register']);
-});
+// ── Central domain ────────────────────────────────────────────────────────────
+Route::get('/', fn () => view('welcome'))->name('home');
 
 // ── Tenant subdomain routes ───────────────────────────────────────────────────
-Route::middleware(['web', 'tenant', 'auth'])
+Route::middleware(['tenant', 'auth'])
     ->name('tenant.')
     ->group(function () {
 
-        // Dashboard — only accessible to subscribed/trial tenants
         Route::get('/dashboard', DashboardController::class)
             ->middleware('subscribed')
             ->name('dashboard');
 
-        // Billing — always accessible so lapsed tenants can resubscribe
         Route::prefix('billing')->name('billing.')->group(function () {
             Route::get('/', [BillingController::class, 'index'])->name('index');
             Route::post('/subscribe', [BillingController::class, 'subscribe'])->name('subscribe');
@@ -31,12 +25,20 @@ Route::middleware(['web', 'tenant', 'auth'])
             Route::get('/portal', [BillingController::class, 'portal'])->name('portal');
         });
 
-        // Settings — owner/admin only
         Route::prefix('settings')->name('settings.')->middleware('role:owner,admin')->group(function () {
             Route::get('/', [SettingsController::class, 'index'])->name('index');
             Route::patch('/', [SettingsController::class, 'update'])->name('update');
         });
+
+        Route::middleware('auth')->group(function () {
+            Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+            Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+            Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+        });
     });
 
-// ── Landlord (super-admin) routes ─────────────────────────────────────────────
+// ── Landlord routes ───────────────────────────────────────────────────────────
 require __DIR__ . '/landlord.php';
+
+// ── Breeze auth routes (login, register, password reset, email verify) ────────
+require __DIR__ . '/auth.php';
